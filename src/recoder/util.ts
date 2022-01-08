@@ -6,7 +6,7 @@ import urljoin from 'url-join';
 
 export const getData = async () => {
   try {
-    const data = await readFile(path.resolve(__dirname, '../../data.json'), {
+    const data = await readFile(path.resolve(__dirname, '../../config.json'), {
       encoding: 'utf8',
       flag: 'r',
     });

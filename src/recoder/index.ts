@@ -16,7 +16,6 @@ const run = async () => {
   page.on('response', async (res) => {
     const endpoint = res.url();
     if (urlFilter(endpoint)) {
-      console.log('>> API endpoint: ', endpoint);
       return readCache(res);
     }
   });
