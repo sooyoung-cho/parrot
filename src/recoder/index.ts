@@ -1,22 +1,22 @@
 import puppeteer from 'puppeteer';
-import { createCache, readCache } from './cache';
-import { createFilter, getData } from './util';
-const intiailize = async () => {
-  await createCache();
-};
+import Recorder from './cache';
+import { createFilter, getData, initializeApp } from './util';
 
 const run = async () => {
-  await intiailize();
+  await initializeApp();
   const data = await getData();
+  const recorder = new Recorder();
+  await recorder.set({ host: data.host });
+
   const urlFilter = createFilter(data);
 
-  const brower = await puppeteer.launch({ headless: false });
+  const brower = await puppeteer.launch({ headless: false, args: [`--window-size=${500},${300}`] });
   const page = await brower.newPage();
 
   page.on('response', async (res) => {
     const endpoint = res.url();
     if (urlFilter(endpoint)) {
-      return readCache(res);
+      return recorder.run(res);
     }
   });
 
@@ -24,4 +24,3 @@ const run = async () => {
 };
 
 run();
-

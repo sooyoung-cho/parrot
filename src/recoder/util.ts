@@ -1,8 +1,10 @@
 // NOTE: util functions are should be pure!
 import path from 'path';
-import { readFile } from 'fs/promises';
+import fs from 'fs';
+import { readFile, mkdir } from 'fs/promises';
 import { DataEntity } from './types';
 import urljoin from 'url-join';
+import { CACHE_ROOT } from '../constants';
 
 export const getData = async () => {
   try {
@@ -23,3 +25,10 @@ export const createFilter = (data: DataEntity) => {
     return list.some((url) => current.indexOf(url) > -1);
   };
 };
+
+
+export const initializeApp = async () => {
+  if(!fs.existsSync(CACHE_ROOT)) {
+    await mkdir(CACHE_ROOT);
+  }
+}

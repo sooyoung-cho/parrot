@@ -1,74 +1,89 @@
-import fsOld from 'fs';
+import fs from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer';
+import { CACHE_ROOT } from '../constants';
 import { CacheEntity, CacheIndexEntity, CacheKey } from './types';
-const fs = fsOld.promises;
+import { mkdir, readFile, writeFile } from 'fs/promises';
 
-const CACHE_ROOT_PATH = process.env.CACHE_ROOT_PATH || path.resolve(__dirname, '../../.cache');
-const CACHE_INDEX_PATH = path.resolve(CACHE_ROOT_PATH, './index.json');
-
-const indexPath = CACHE_INDEX_PATH;
-const parsefilePath = (filename: string) => path.resolve(CACHE_ROOT_PATH, filename);
-const isExist = (p: string) => fsOld.existsSync(p);
-
-const createCacheCollection = async (filename: string = '/') => {
-  if (!isExist(CACHE_ROOT_PATH)) await fs.mkdir(CACHE_ROOT_PATH);
-
-  await fs.writeFile(path.resolve(CACHE_ROOT_PATH, filename), '{}', { encoding: 'utf-8' });
-};
-const readCacheCollection = async <T>(filename: string = '/'): Promise<T> => {
-  const rawFile = await fs.readFile(path.resolve(CACHE_ROOT_PATH, filename), { encoding: 'utf-8' });
-  return JSON.parse(rawFile) as T;
-};
-
-const _updateIndexFile = async (cacheKey: CacheKey) => {
-  let index = await readCacheCollection<CacheIndexEntity>();
-  if (index[cacheKey.filename]) index[cacheKey.filename] = [...new Set([...index[cacheKey.filename], cacheKey.key])];
-  else index[cacheKey.filename] = [cacheKey.key];
-  await fs.writeFile(CACHE_INDEX_PATH, JSON.stringify(index), { encoding: 'utf-8' });
-};
-
-const _updateCacheFile = async (p: string, data: CacheEntity) => {
-  await fs.writeFile(path.resolve(CACHE_ROOT_PATH, p), JSON.stringify(data), { encoding: 'utf-8' });
-};
-
-
-const createCacheKey = (res: puppeteer.HTTPResponse): CacheKey => {
-  const url = new URL(res.url());
-  const req = res.request();
-  const apiName = `${req.method()}_${url.pathname.split('/').join('_')}`;
-  const queries = url.search;
-  return {
-    filename: apiName + '.json',
-    key: queries === '' ? '/' : queries,
-  };
-};
-const isCached = async (cacheKey: CacheKey) => {
-  if (!isExist(indexPath)) throw new Error('.cache/index.json is not exist!');
-
-  const index = await readCacheCollection<CacheIndexEntity>();
-  return !!index[cacheKey.filename]?.some((key) => key === cacheKey.key);
-};
-
-////----
-export const createCache = async () => {
-  if (!isExist(indexPath)) {
-    await createCacheCollection();
-  }
-};
-export const readCache = async (res: puppeteer.HTTPResponse) => {
-  const cacheKey = createCacheKey(res);
-  if (await isCached(cacheKey)) {
-    const cached = await readCacheCollection<CacheEntity>(cacheKey.filename);
-    return cached[cacheKey.key];
-  } else {
-    const filePath = parsefilePath(cacheKey.filename);
-    if (!isExist(filePath)) {
-      await createCacheCollection(cacheKey.filename);
+export default class Recorder {
+  private hostRootPath = '';
+  private indexPath = '';
+  constructor() {}
+  public async set({ host }: { host: string }) {
+    const siteName = new URL(host).hostname.replaceAll('.', '_');
+    try {
+      const hPath = path.join(CACHE_ROOT, siteName);
+      if (!this.isExist(hPath)) {
+        await mkdir(hPath, { recursive: true });
+      }
+      const iPath = path.join(CACHE_ROOT, siteName, 'index.json');
+      if (!this.isExist(iPath)) {
+        await writeFile(iPath, '{}', { encoding: 'utf-8' });
+      }
+      this.hostRootPath = hPath;
+      this.indexPath = iPath;
+    } catch (e) {
+      console.error(e);
+      process.exit(1);
     }
-    await _updateIndexFile(cacheKey);
-    const cached = { [cacheKey.key]: await res.json() };
-    await _updateCacheFile(cacheKey.filename, cached);
-    return cached[cacheKey.key];
   }
-};
+
+  // >> entry
+  public async run(res: puppeteer.HTTPResponse) {
+    try {
+      const cacheKey = this.generateCacheKey(res);
+      if (await this.isCached(cacheKey)) {
+        const cached = await this.readCacheFile(cacheKey);
+        return cached[cacheKey.key];
+      } else {
+        const cached = await this.updateCache(cacheKey, res);
+        return cached[cacheKey.key];
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  // >>> utils
+  private generateCacheKey(res: puppeteer.HTTPResponse): CacheKey {
+    const url = new URL(res.url());
+    const req = res.request();
+    const filename = `${req.method()}_${url.pathname.split('/').join('_')}.json`;
+    const queries = url.search;
+    return {
+      path: path.join(this.hostRootPath, url.pathname),
+      filename,
+      key: queries === '' ? '.' : queries,
+    };
+  }
+  private async isCached(cacheKey: CacheKey) {
+    const rawIndex = await readFile(this.indexPath, { encoding: 'utf-8' });
+    const index = JSON.parse(rawIndex) as CacheIndexEntity;
+    return !!index[cacheKey.filename]?.find((key) => key === cacheKey.key);
+  }
+
+  private async createCacheFile(cacheKey: CacheKey, cache?: string) {
+    await mkdir(cacheKey.path, { recursive: true });
+    await writeFile(path.join(cacheKey.path, cacheKey.filename), cache || '{}', { encoding: 'utf-8' });
+  }
+  private async readCacheFile(cacheKey: CacheKey) {
+    const filepath = path.join(cacheKey.path, cacheKey.filename);
+    const rawFile = await readFile(filepath, { encoding: 'utf-8' });
+    return JSON.parse(rawFile) as CacheEntity;
+  }
+
+  private async updateCache(cacheKey: CacheKey, res: puppeteer.HTTPResponse) {
+    const filepath = path.join(cacheKey.path, cacheKey.filename);
+    if (!this.isExist(filepath)) {
+      await this.createCacheFile(cacheKey);
+    }
+    const cached = await this.readCacheFile(cacheKey);
+
+    cached[cacheKey.key] = await res.json();
+    await this.createCacheFile(cacheKey, JSON.stringify(cached));
+    return cached;
+  }
+
+  private isExist(p: string) {
+    return fs.existsSync(p);
+  }
+}
