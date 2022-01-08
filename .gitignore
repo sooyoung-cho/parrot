@@ -1,0 +1,15 @@
+# System
+.DS_Store
+.Trashes
+*.swp
+
+
+# Node
+npm-debug.log*
+node_modules
+
+
+# Workspace
+.vscode
+.cache
+.env
