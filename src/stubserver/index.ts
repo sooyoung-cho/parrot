@@ -9,6 +9,7 @@ const app: Application = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// TODO: How can server receive a host info from the client?
 const prefix = path.join(CACHE_ROOT + '/www_mymusictaste_com');
 const getCache = async (req: Request) => {
   const endpoint = req.params[0];
