@@ -8,8 +8,9 @@
   "private": "true",
   "scripts": {
     "dev:record": "ts-node-dev --respawn src/recoder/index.ts",
+    "dev:serve": "ts-node-dev --respawn src/stubserver/index.ts",
     "record": "ts-node src/recoder/index.ts",
-    "start": "ts-node src/index.ts",
+    "serve": "ts-node src/stubserver/index.ts",
     "prepare": "husky install"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^16.0.0",
+    "@types/express": "^4.17.13",
     "@types/jest": "^27.4.0",
     "@types/node": "^17.0.8",
     "@types/puppeteer": "^5.4.4",
