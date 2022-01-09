@@ -2,6 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import path from 'path';
 import { CACHE_ROOT } from '../constants';
 import { readFile } from 'fs/promises';
+import fs from 'fs';
 
 const app: Application = express();
 
@@ -15,6 +16,7 @@ const getCache = async (req: Request) => {
   const key = req.originalUrl.replace(req.path, '');
   const filepath = path.join(prefix, endpoint, `${filename}`);
 
+  if (!fs.existsSync(filepath)) return { message: 'Not cached yet.' };
   const cacheFile = await readFile(filepath, { encoding: 'utf-8' });
   const rawCache = JSON.parse(cacheFile);
   const cache = rawCache[key];
@@ -26,9 +28,6 @@ app.get('/parrot/*', async (req: Request, res: Response, next) => {
   const cache = await getCache(req);
   res.json(cache);
   next();
-});
-app.get('*', (req, res) => {
-  res.send('Invalid request');
 });
 
 const PORT = process.env.PORT || 3000;
