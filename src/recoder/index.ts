@@ -10,7 +10,10 @@ const run = async () => {
 
   const urlFilter = createFilter(data);
 
-  const brower = await puppeteer.launch({ headless: false, args: [`--window-size=${500},${300}`] });
+  const brower = await puppeteer.launch({
+    headless: false,
+    args: [`--window-size=${500},${300}`, '--ignore-certificate-errors'],
+  });
   const page = await brower.newPage();
 
   page.on('response', async (res) => {
